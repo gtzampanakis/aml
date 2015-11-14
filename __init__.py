@@ -6,48 +6,50 @@ from pypeg2 import *
 def create_lang_instance(var_map = None):
 	"""
 	>>> cli = create_lang_instance
-	>>> c,e = cli(); e(c('1 = 1'))
+	>>> compile, evaluate, python_translate, sql_translate = cli()
+	>>> evaluate(compile('1 = 1'))
 	True
-	>>> c,e = cli(); e(c('1 = 0'))
+	>>> c,e,p,s = cli(); e(c('1 = 0'))
 	False
-	>>> c,e = cli(); e(c('"1" = "1"'))
+	>>> c,e,p,s = cli(); e(c('"1" = "1"'))
 	True
-	>>> c,e = cli({'foo' : 1}); e(c('foo = 1'))
+	>>> c,e,p,s = cli({'foo' : 1}); e(c('foo = 1'))
 	True
-	>>> c,e = cli({'foo' : 1.00}); e(c('foo = 1'))
+	>>> c,e,p,s = cli({'foo' : 1.00}); e(c('foo = 1'))
 	True
-	>>> c,e = cli({'foo' : 2.24}); e(c('foo = 2.24'))
+	>>> c,e,p,s = cli({'foo' : 2.24}); e(c('foo = 2.24'))
 	True
-	>>> c,e = cli(); e(c("'foo'" + '=' + '"foo"'))
+	>>> c,e,p,s = cli(); e(c("'foo'" + '=' + '"foo"'))
 	True
-	>>> c,e = cli({'foo' : 'foo'}); e(c('foo = "foo"'))
+	>>> c,e,p,s = cli({'foo' : 'foo'}); e(c('foo = "foo"'))
 	True
-	>>> c,e = cli(); e(c('true or 1=1 and 0=1'))
+	>>> c,e,p,s = cli(); e(c('(1=1)'))
 	True
-	>>> c,e = cli(); e(c('(1=1)'))
-	True
-	>>> c,e = cli(); e(c('(true or 1=1) and 0=1'))
+	>>> c,e,p,s = cli(); e(c('1 > 1'))
 	False
-	>>> c,e = cli(); e(c('1 > 1'))
-	False
-	>>> c,e = cli(); e(c('not 1 > 1'))
+	>>> c,e,p,s = cli(); e(c('not 1 > 1'))
 	True
-	>>> c,e = cli(); e(c('1 != 1'))
+	>>> c,e,p,s = cli(); e(c('1 != 1'))
 	False
-	>>> c,e = cli(); e(c('-2 = -2'))
+	>>> c,e,p,s = cli(); e(c('-2 = -2'))
+	True
+	>>> c,e,p,s = cli(); eval(p(c('-2 = -2')))
 	True
 	"""
+
+# This is needed because using a plain 'not' will remove it from the ast when
+# parsed.
+	RE_NOT = re.compile('not')
+
+# And this is needed because otherwise "not" will be usable as an Indentifier.
+	K('not')
 
 	def py_bool_to_lit(py_bool):
 		return parse( 'true' if py_bool else 'false', BooleanLiteral)
 
-	class Identifier(Symbol):
-		pass
+	class Identifier(str):
+		grammar = word
 
-	if var_map:
-		Identifier.grammar = Enum(*[K(v) for v in var_map.iterkeys()]) 
-
-		
 	class StringLiteral(str):
 
 		def __new__(cls, s):
@@ -80,14 +82,19 @@ def create_lang_instance(var_map = None):
 
 	ComparisonOperation.grammar = (
 			Comparable,
+			blank,
 			attr('comp_op', ComparisonOperator),
+			blank,
 			Comparable,
 	)
 
 	class BooleanOperationSimple(List):
+# The flag() pypeg2 function works great when parsing but does not work when
+# composing (the flag gets output whether it was in the source text or not. So
+# a workaround is this:
 		grammar = (
-				flag('negated', K('not')),
-				[BooleanLiteral, ComparisonOperation]
+				attr('negated', optional(RE_NOT)),
+				ComparisonOperation,
 		)
 
 	class BooleanOperation(List):
@@ -96,7 +103,9 @@ def create_lang_instance(var_map = None):
 	BooleanOperation.grammar = (
 			BooleanOperationSimple,
 			maybe_some(
+				blank,
 				BooleanFunctionName,
+				blank,
 				BooleanOperationSimple,
 			),
 	)
@@ -107,7 +116,9 @@ def create_lang_instance(var_map = None):
 	Expression.grammar = (
 			[BooleanOperationSimple, ('(', Expression, ')')],
 			maybe_some(
+				blank,
 				BooleanFunctionName,
+				blank,
 				[BooleanOperationSimple, ('(', Expression, ')')],
 			),
 	)
@@ -192,8 +203,11 @@ def create_lang_instance(var_map = None):
 						)
 						return en(Expression(new_self))
 
+	def compose_node_to_python(node):
+		return compose(node)
 
-
+	def compose_node_to_sql(node):
+		return compose(node)
 
 	def aml_compile(source):
 		return parse(source, Expression)
@@ -202,5 +216,31 @@ def create_lang_instance(var_map = None):
 		result = eval_node(aml_c)
 		return result
 
-	return aml_compile, aml_evaluate
+	def aml_translate_python(aml_c):
+
+		def compose(self, *args, **kwargs):
+			if self == '=':
+				return '=='
+			else:
+				return self
+
+		ComparisonOperator.compose = compose
+
+		result = compose_node_to_python(aml_c)
+		return result
+
+	def aml_translate_sql(aml_c):
+
+		def compose(self, *args, **kwargs):
+			if self == '!=':
+				return '<>'
+			else:
+				return self
+
+		ComparisonOperator.compose = compose
+
+		result = compose_node_to_sql(aml_c)
+		return result
+
+	return aml_compile, aml_evaluate, aml_translate_python, aml_translate_sql
 

@@ -5,36 +5,35 @@ Accounting Mini Language --- Small and simple expression language running on Pyt
 
 The grammar and parser utilise the [pypeg2](http://fdik.org/pyPEG/) library which must be installed for aml to work.
 
-To use `aml` the programmer creates a "language instace", which currently is a (compile, evaluate) function pair. Calling the compile function yields an object (essentially an AST). This object can then be evaluated. Since the language is very simple, sufficient documentation can be given by example:
+To use `aml` the programmer creates a "language instace", which currently is a (compile, evaluate) function pair. Calling the compile function yields an object (essentially an AST). This object can then be evaluated directly or translated to Python or SQL. Since the language is very simple, sufficient documentation can be given by example:
 
 	>>> cli = create_lang_instance
-	>>> c,e = cli(); e(c('1 = 1'))
+	>>> compile, evaluate, python_translate, sql_translate = cli()
+	>>> evaluate(compile('1 = 1'))
 	True
-	>>> c,e = cli(); e(c('1 = 0'))
+	>>> c,e,p,s = cli(); e(c('1 = 0'))
 	False
-	>>> c,e = cli(); e(c('"1" = "1"'))
+	>>> c,e,p,s = cli(); e(c('"1" = "1"'))
 	True
-	>>> c,e = cli({'foo' : 1}); e(c('foo = 1'))
+	>>> c,e,p,s = cli({'foo' : 1}); e(c('foo = 1'))
 	True
-	>>> c,e = cli({'foo' : 1.00}); e(c('foo = 1'))
+	>>> c,e,p,s = cli({'foo' : 1.00}); e(c('foo = 1'))
 	True
-	>>> c,e = cli({'foo' : 2.24}); e(c('foo = 2.24'))
+	>>> c,e,p,s = cli({'foo' : 2.24}); e(c('foo = 2.24'))
 	True
-	>>> c,e = cli(); e(c("'foo'" + '=' + '"foo"'))
+	>>> c,e,p,s = cli(); e(c("'foo'" + '=' + '"foo"'))
 	True
-	>>> c,e = cli({'foo' : 'foo'}); e(c('foo = "foo"'))
+	>>> c,e,p,s = cli({'foo' : 'foo'}); e(c('foo = "foo"'))
 	True
-	>>> c,e = cli(); e(c('true or 1=1 and 0=1'))
+	>>> c,e,p,s = cli(); e(c('(1=1)'))
 	True
-	>>> c,e = cli(); e(c('(1=1)'))
-	True
-	>>> c,e = cli(); e(c('(true or 1=1) and 0=1'))
+	>>> c,e,p,s = cli(); e(c('1 > 1'))
 	False
-	>>> c,e = cli(); e(c('1 > 1'))
-	False
-	>>> c,e = cli(); e(c('not 1 > 1'))
+	>>> c,e,p,s = cli(); e(c('not 1 > 1'))
 	True
-	>>> c,e = cli(); e(c('1 != 1'))
+	>>> c,e,p,s = cli(); e(c('1 != 1'))
 	False
-	>>> c,e = cli(); e(c('-2 = -2'))
+	>>> c,e,p,s = cli(); e(c('-2 = -2'))
+	True
+	>>> c,e,p,s = cli(); eval(p(c('-2 = -2')))
 	True
