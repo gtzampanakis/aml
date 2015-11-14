@@ -35,6 +35,10 @@ def create_lang_instance(var_map = None):
 	True
 	>>> c,e,p,s = cli(); eval(p(c('-2 = -2')))
 	True
+	>>> c,e,p,s = cli(); eval(p(c('null = null')))
+	True
+	>>> c,e,p,s = cli(); eval(p(c('1 = null')))
+	False
 	"""
 
 # This is needed because using a plain 'not' will remove it from the ast when
@@ -63,19 +67,21 @@ def create_lang_instance(var_map = None):
 	class FloatLiteral(float):
 		grammar = re.compile(r'-?\d+.\d+')
 
-	Comparable = [FloatLiteral, IntegerLiteral, StringLiteral, Identifier]
-
 	class BooleanLiteral(Keyword):
 		grammar = Enum(K('true'), K('false'))
+
+	class NullLiteral(Keyword):
+		grammar = Enum(K('null'))
+
+	Comparable = [NullLiteral, FloatLiteral, IntegerLiteral, 
+									StringLiteral, Identifier]
+
 
 	class ComparisonOperator(str):
 		grammar = re.compile(r'=|>|<|!=|>=|<=')
 
 	class BooleanFunctionName(Keyword):
 		grammar = Enum(K('and'), K('or'))
-
-	class ComparisonOperator(str):
-		grammar = re.compile(r'=|>|<|!=|>=|<=')
 
 	class ComparisonOperation(List):
 		pass
@@ -138,6 +144,8 @@ def create_lang_instance(var_map = None):
 				return True
 			elif node == 'false':
 				return False
+		elif isinstance(node, NullLiteral):
+			return None
 		elif isinstance(node, ComparisonOperation):
 			opa, opb = node[0:2]
 			if node.comp_op == '=':
@@ -218,28 +226,80 @@ def create_lang_instance(var_map = None):
 
 	def aml_translate_python(aml_c):
 
-		def compose(self, *args, **kwargs):
+		def comp_op_compose(self, *args, **kwargs):
 			if self == '=':
 				return '=='
 			else:
 				return self
 
-		ComparisonOperator.compose = compose
+		def null_compose(self, *args, **kwargs):
+			return 'None'
+
+		ComparisonOperator.compose = comp_op_compose
+		NullLiteral.compose = null_compose
 
 		result = compose_node_to_python(aml_c)
+
+		delattr(ComparisonOperator, 'compose')
+		delattr(NullLiteral, 'compose')
+
 		return result
 
 	def aml_translate_sql(aml_c):
 
-		def compose(self, *args, **kwargs):
+		def comp_op_compose(self, *args, **kwargs):
 			if self == '!=':
 				return '<>'
 			else:
 				return self
 
-		ComparisonOperator.compose = compose
+		def comp_op_compose(self, *args, **kwargs):
+			if self == '!=':
+				return '<>'
+			else:
+				return self
+
+		def null_compose(self, *args, **kwargs):
+			return 'null'
+
+		def comp_operation_compose(self, *args, **kwargs):
+			if (
+					(
+						isinstance(self[0], NullLiteral) 
+							or
+						isinstance(self[1], NullLiteral)
+					)
+						and
+					(
+						self.comp_op in ('=', '!=')
+					)
+			):
+
+				if self.comp_op == '=':
+					middle = 'is'
+				else:
+					middle = 'is not'
+
+			else:
+				middle = compose(self.comp_op)
+
+			return ' '.join([
+				compose(self[0]),
+				middle,
+				compose(self[1]),
+			])
+
+
+		ComparisonOperator.compose = comp_op_compose
+		NullLiteral.compose = null_compose
+		ComparisonOperation.compose = comp_operation_compose
 
 		result = compose_node_to_sql(aml_c)
+
+		delattr(ComparisonOperator, 'compose')
+		delattr(NullLiteral, 'compose')
+		delattr(ComparisonOperation, 'compose')
+
 		return result
 
 	return aml_compile, aml_evaluate, aml_translate_python, aml_translate_sql

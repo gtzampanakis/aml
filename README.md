@@ -37,3 +37,8 @@ To use `aml` the programmer creates a "language instace", which currently is a (
 	True
 	>>> c,e,p,s = cli(); eval(p(c('-2 = -2')))
 	True
+	>>> c,e,p,s = cli(); eval(p(c('null = null')))
+	True
+	>>> c,e,p,s = cli(); eval(p(c('1 = null')))
+	False
+
