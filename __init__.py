@@ -39,6 +39,12 @@ def create_lang_instance(var_map = None):
 	True
 	>>> c,e,p,s = cli(); eval(p(c('1 = null')))
 	False
+	>>> c,e,p,s = cli(); e(c('"foo" = "foo"'))
+	True
+	>>> c,e,p,s = cli(); e(c('"foo" = \\'foo\\''))
+	True
+	>>> c,e,p,s = cli(); e(c('"fo\\'o" = "fo\\'o"'))
+	True
 	"""
 
 # This is needed because using a plain 'not' will remove it from the ast when
@@ -59,7 +65,7 @@ def create_lang_instance(var_map = None):
 		def __new__(cls, s):
 			return super(StringLiteral, cls).__new__(cls, ast.literal_eval(s))
 
-		grammar = [re.compile(r'".+?"'), re.compile(r"'.+?'")]
+		grammar = [re.compile(r'"[^\\\n\r]+?"'), re.compile(r"'[^\\\n\r]+?'")]
 
 	class IntegerLiteral(int):
 		grammar = re.compile(r'-?\d+')
@@ -235,13 +241,18 @@ def create_lang_instance(var_map = None):
 		def null_compose(self, *args, **kwargs):
 			return 'None'
 
+		def string_compose(self, *args, **kwargs):
+			return '"' + self.replace('"', r'\"') + '"'
+
 		ComparisonOperator.compose = comp_op_compose
 		NullLiteral.compose = null_compose
+		StringLiteral.compose = string_compose
 
 		result = compose_node_to_python(aml_c)
 
 		delattr(ComparisonOperator, 'compose')
 		delattr(NullLiteral, 'compose')
+		delattr(StringLiteral, 'compose')
 
 		return result
 
@@ -261,6 +272,9 @@ def create_lang_instance(var_map = None):
 
 		def null_compose(self, *args, **kwargs):
 			return 'null'
+
+		def string_compose(self, *args, **kwargs):
+			return "'" + self.replace("'", "''") + "'"
 
 		def comp_operation_compose(self, *args, **kwargs):
 			if (
@@ -293,12 +307,14 @@ def create_lang_instance(var_map = None):
 		ComparisonOperator.compose = comp_op_compose
 		NullLiteral.compose = null_compose
 		ComparisonOperation.compose = comp_operation_compose
+		StringLiteral.compose = string_compose
 
 		result = compose_node_to_sql(aml_c)
 
 		delattr(ComparisonOperator, 'compose')
 		delattr(NullLiteral, 'compose')
 		delattr(ComparisonOperation, 'compose')
+		delattr(StringLiteral, 'compose')
 
 		return result
 
