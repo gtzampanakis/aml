@@ -5,7 +5,7 @@ Accounting Mini Language --- Small and simple expression language running on Pyt
 
 The grammar and parser utilise the [pypeg2](http://fdik.org/pyPEG/) library which must be installed for aml to work.
 
-To use `aml` the programmer creates a "language instace", which currently is a (compile, evaluate) function pair. Calling the compile function yields an object (essentially an AST). This object can then be evaluated directly or translated to Python or SQL. Since the language is very simple, sufficient documentation can be given by example:
+To use `aml` the programmer creates a "language instace" which is simply a set of functions. Calling the compile function yields an object (essentially an AST). This object can then be evaluated directly using the evaluate function or translated to Python or SQL using the respective functions. Since the language is very simple sufficient documentation can be given by example:
 
 	>>> cli = create_lang_instance
 	>>> compile, evaluate, python_translate, sql_translate = cli()
