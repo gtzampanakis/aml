@@ -7,38 +7,82 @@ The grammar and parser utilise the [pypeg2](http://fdik.org/pyPEG/) library whic
 
 To use `aml` the programmer creates a "language instace" which is simply a set of functions. Calling the compile function yields an object (essentially an AST). This object can then be evaluated directly using the evaluate function or translated to Python or SQL using the respective functions. Since the language is very simple sufficient documentation can be given by example:
 
-	>>> cli = create_lang_instance
-	>>> compile, evaluate, python_translate, sql_translate = cli()
-	>>> evaluate(compile('1 = 1'))
+	>>> lang_instance = create_lang_instance()
+	>>> lang_instance.aml_evaluate(lang_instance.aml_compile('1 = 1'))
 	True
-	>>> c,e,p,s = cli(); e(c('1 = 0'))
+	>>> li = create_lang_instance()
+	>>> c = li.aml_compile
+	>>> e = li.aml_evaluate
+	>>> p = li.aml_translate_python
+	>>> s = li.aml_translate_sql
+	>>> u = li.aml_suggest
+	>>> e(c('1 = 0'))
 	False
-	>>> c,e,p,s = cli(); e(c('"1" = "1"'))
+	>>> e(c('"1" = "1"'))
 	True
-	>>> c,e,p,s = cli({'foo' : 1}); e(c('foo = 1'))
+	>>> e(c('(1=1)'))
 	True
-	>>> c,e,p,s = cli({'foo' : 1.00}); e(c('foo = 1'))
-	True
-	>>> c,e,p,s = cli({'foo' : 2.24}); e(c('foo = 2.24'))
-	True
-	>>> c,e,p,s = cli(); e(c("'foo'" + '=' + '"foo"'))
-	True
-	>>> c,e,p,s = cli({'foo' : 'foo'}); e(c('foo = "foo"'))
-	True
-	>>> c,e,p,s = cli(); e(c('(1=1)'))
-	True
-	>>> c,e,p,s = cli(); e(c('1 > 1'))
+	>>> e(c('1 > 1'))
 	False
-	>>> c,e,p,s = cli(); e(c('not 1 > 1'))
+	>>> e(c('not 1 > 1'))
 	True
-	>>> c,e,p,s = cli(); e(c('1 != 1'))
+	>>> e(c('1 != 1'))
 	False
-	>>> c,e,p,s = cli(); e(c('-2 = -2'))
+	>>> e(c('-2 = -2'))
 	True
-	>>> c,e,p,s = cli(); eval(p(c('-2 = -2')))
+	>>> eval(p(c('-2 = -2')))
 	True
-	>>> c,e,p,s = cli(); eval(p(c('null = null')))
+	>>> eval(p(c('null = null')))
 	True
-	>>> c,e,p,s = cli(); eval(p(c('1 = null')))
+	>>> eval(p(c('1 = null')))
 	False
-
+	>>> e(c('"foo" = "foo"'))
+	True
+	>>> e(c('"foo" = \\'foo\\''))
+	True
+	>>> e(c('"fo\\'o" = "fo\\'o"'))
+	True
+	>>> e(c("'foo'" + '=' + '"foo"'))
+	True
+	>>> li = create_lang_instance({'foo' : 1});
+	>>> c = li.aml_compile
+	>>> e = li.aml_evaluate
+	>>> e(c('foo = 1'))
+	True
+	>>> li = create_lang_instance({'foo' : 1.00})
+	>>> c = li.aml_compile
+	>>> e = li.aml_evaluate
+	>>> e(c('foo = 1'))
+	True
+	>>> li = create_lang_instance({'foo' : 2.24})
+	>>> c = li.aml_compile
+	>>> e = li.aml_evaluate
+	>>> e(c('foo = 2.24'))
+	True
+	>>> li = create_lang_instance({'foo' : 'foo'})
+	>>> c = li.aml_compile
+	>>> e = li.aml_evaluate
+	>>> e(c('foo = "foo"'))
+	True
+	>>> li = create_lang_instance()
+	>>> c = li.aml_compile
+	>>> p = li.aml_translate_python
+	>>> s = li.aml_translate_sql
+	>>> s(c('null = null'))
+	u'null is null'
+	>>> p(c('null = null'))
+	u'None == None'
+	>>> s(c('null != null'))
+	u'null is not null'
+	>>> p(c('null != null'))
+	u'None != None'
+	>>> s(c('5 != 3'))
+	u'5 <> 3'
+	>>> p(c('5 != 3'))
+	u'5 != 3'
+	>>> li = create_lang_instance({'foo' : 'bar', 'fo2' : 'ba2'})
+	>>> u = li.aml_suggest
+	>>> u('1 = fo')
+	[u'fo2', u'foo']
+	>>> u('1 = FO')
+	[u'fo2', u'foo']

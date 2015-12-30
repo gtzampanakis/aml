@@ -2,138 +2,179 @@ from __future__ import unicode_literals, print_function
 import re, itertools, operator, ast
 from pypeg2 import *
 
-
-def create_lang_instance(var_map = None):
-	"""
-	>>> cli = create_lang_instance
-	>>> compile, evaluate, python_translate, sql_translate = cli()
-	>>> evaluate(compile('1 = 1'))
-	True
-	>>> c,e,p,s = cli(); e(c('1 = 0'))
-	False
-	>>> c,e,p,s = cli(); e(c('"1" = "1"'))
-	True
-	>>> c,e,p,s = cli({'foo' : 1}); e(c('foo = 1'))
-	True
-	>>> c,e,p,s = cli({'foo' : 1.00}); e(c('foo = 1'))
-	True
-	>>> c,e,p,s = cli({'foo' : 2.24}); e(c('foo = 2.24'))
-	True
-	>>> c,e,p,s = cli(); e(c("'foo'" + '=' + '"foo"'))
-	True
-	>>> c,e,p,s = cli({'foo' : 'foo'}); e(c('foo = "foo"'))
-	True
-	>>> c,e,p,s = cli(); e(c('(1=1)'))
-	True
-	>>> c,e,p,s = cli(); e(c('1 > 1'))
-	False
-	>>> c,e,p,s = cli(); e(c('not 1 > 1'))
-	True
-	>>> c,e,p,s = cli(); e(c('1 != 1'))
-	False
-	>>> c,e,p,s = cli(); e(c('-2 = -2'))
-	True
-	>>> c,e,p,s = cli(); eval(p(c('-2 = -2')))
-	True
-	>>> c,e,p,s = cli(); eval(p(c('null = null')))
-	True
-	>>> c,e,p,s = cli(); eval(p(c('1 = null')))
-	False
-	>>> c,e,p,s = cli(); e(c('"foo" = "foo"'))
-	True
-	>>> c,e,p,s = cli(); e(c('"foo" = \\'foo\\''))
-	True
-	>>> c,e,p,s = cli(); e(c('"fo\\'o" = "fo\\'o"'))
-	True
-	"""
-
 # This is needed because using a plain 'not' will remove it from the ast when
 # parsed.
-	RE_NOT = re.compile('not')
+RE_NOT = re.compile('not')
 
 # And this is needed because otherwise "not" will be usable as an Indentifier.
-	K('not')
+K('not')
 
-	def py_bool_to_lit(py_bool):
-		return parse( 'true' if py_bool else 'false', BooleanLiteral)
+def py_bool_to_lit(py_bool):
+    return parse( 'true' if py_bool else 'false', BooleanLiteral)
 
-	class Identifier(str):
-		grammar = word
+class Identifier(str):
+    grammar = word
 
-	class StringLiteral(str):
+class StringLiteral(str):
 
-		def __new__(cls, s):
-			return super(StringLiteral, cls).__new__(cls, ast.literal_eval(s))
+    def __new__(cls, s):
+        return super(StringLiteral, cls).__new__(cls, ast.literal_eval(s))
 
-		grammar = [re.compile(r'"[^\\\n\r]+?"'), re.compile(r"'[^\\\n\r]+?'")]
+    grammar = [re.compile(r'"[^\\\n\r]+?"'), re.compile(r"'[^\\\n\r]+?'")]
 
-	class IntegerLiteral(int):
-		grammar = re.compile(r'-?\d+')
+class IntegerLiteral(int):
+    grammar = re.compile(r'-?\d+')
 
-	class FloatLiteral(float):
-		grammar = re.compile(r'-?\d+.\d+')
+class FloatLiteral(float):
+    grammar = re.compile(r'-?\d+.\d+')
 
-	class BooleanLiteral(Keyword):
-		grammar = Enum(K('true'), K('false'))
+class BooleanLiteral(Keyword):
+    grammar = Enum(K('true'), K('false'))
 
-	class NullLiteral(Keyword):
-		grammar = Enum(K('null'))
+class NullLiteral(Keyword):
+    grammar = Enum(K('null'))
 
-	Comparable = [NullLiteral, FloatLiteral, IntegerLiteral, 
-									StringLiteral, Identifier]
+Comparable = [NullLiteral, FloatLiteral, IntegerLiteral, 
+                                StringLiteral, Identifier]
 
 
-	class ComparisonOperator(str):
-		grammar = re.compile(r'=|>|<|!=|>=|<=')
+class ComparisonOperator(str):
+    grammar = re.compile(r'=|>|<|!=|>=|<=')
 
-	class BooleanFunctionName(Keyword):
-		grammar = Enum(K('and'), K('or'))
+class BooleanFunctionName(Keyword):
+    grammar = Enum(K('and'), K('or'))
 
-	class ComparisonOperation(List):
-		pass
+class ComparisonOperation(List):
+    pass
 
-	ComparisonOperation.grammar = (
-			Comparable,
-			blank,
-			attr('comp_op', ComparisonOperator),
-			blank,
-			Comparable,
-	)
+ComparisonOperation.grammar = (
+        Comparable,
+        blank,
+        attr('comp_op', ComparisonOperator),
+        blank,
+        Comparable,
+)
 
-	class BooleanOperationSimple(List):
+class BooleanOperationSimple(List):
 # The flag() pypeg2 function works great when parsing but does not work when
 # composing (the flag gets output whether it was in the source text or not. So
 # a workaround is this:
-		grammar = (
-				attr('negated', optional(RE_NOT)),
-				ComparisonOperation,
-		)
+    grammar = (
+            attr('negated', optional(RE_NOT)),
+            ComparisonOperation,
+    )
 
-	class BooleanOperation(List):
-		pass
+class BooleanOperation(List):
+    pass
 
-	BooleanOperation.grammar = (
-			BooleanOperationSimple,
-			maybe_some(
-				blank,
-				BooleanFunctionName,
-				blank,
-				BooleanOperationSimple,
-			),
-	)
+BooleanOperation.grammar = (
+        BooleanOperationSimple,
+        maybe_some(
+            blank,
+            BooleanFunctionName,
+            blank,
+            BooleanOperationSimple,
+        ),
+)
 
-	class Expression(List):
-		pass
+class Expression(List):
+    pass
 
-	Expression.grammar = (
-			[BooleanOperationSimple, ('(', Expression, ')')],
-			maybe_some(
-				blank,
-				BooleanFunctionName,
-				blank,
-				[BooleanOperationSimple, ('(', Expression, ')')],
-			),
-	)
+Expression.grammar = (
+        [BooleanOperationSimple, ('(', Expression, ')')],
+        maybe_some(
+            blank,
+            BooleanFunctionName,
+            blank,
+            [BooleanOperationSimple, ('(', Expression, ')')],
+        ),
+)
+
+class LangInstance:
+	pass
+
+def create_lang_instance(var_map = None):
+	"""
+	>>> lang_instance = create_lang_instance()
+	>>> lang_instance.aml_evaluate(lang_instance.aml_compile('1 = 1'))
+	True
+	>>> li = create_lang_instance()
+	>>> c = li.aml_compile
+	>>> e = li.aml_evaluate
+	>>> p = li.aml_translate_python
+	>>> s = li.aml_translate_sql
+	>>> u = li.aml_suggest
+	>>> e(c('1 = 0'))
+	False
+	>>> e(c('"1" = "1"'))
+	True
+	>>> e(c('(1=1)'))
+	True
+	>>> e(c('1 > 1'))
+	False
+	>>> e(c('not 1 > 1'))
+	True
+	>>> e(c('1 != 1'))
+	False
+	>>> e(c('-2 = -2'))
+	True
+	>>> eval(p(c('-2 = -2')))
+	True
+	>>> eval(p(c('null = null')))
+	True
+	>>> eval(p(c('1 = null')))
+	False
+	>>> e(c('"foo" = "foo"'))
+	True
+	>>> e(c('"foo" = \\'foo\\''))
+	True
+	>>> e(c('"fo\\'o" = "fo\\'o"'))
+	True
+	>>> e(c("'foo'" + '=' + '"foo"'))
+	True
+	>>> li = create_lang_instance({'foo' : 1});
+	>>> c = li.aml_compile
+	>>> e = li.aml_evaluate
+	>>> e(c('foo = 1'))
+	True
+	>>> li = create_lang_instance({'foo' : 1.00})
+	>>> c = li.aml_compile
+	>>> e = li.aml_evaluate
+	>>> e(c('foo = 1'))
+	True
+	>>> li = create_lang_instance({'foo' : 2.24})
+	>>> c = li.aml_compile
+	>>> e = li.aml_evaluate
+	>>> e(c('foo = 2.24'))
+	True
+	>>> li = create_lang_instance({'foo' : 'foo'})
+	>>> c = li.aml_compile
+	>>> e = li.aml_evaluate
+	>>> e(c('foo = "foo"'))
+	True
+	>>> li = create_lang_instance()
+	>>> c = li.aml_compile
+	>>> p = li.aml_translate_python
+	>>> s = li.aml_translate_sql
+	>>> s(c('null = null'))
+	u'null is null'
+	>>> p(c('null = null'))
+	u'None == None'
+	>>> s(c('null != null'))
+	u'null is not null'
+	>>> p(c('null != null'))
+	u'None != None'
+	>>> s(c('5 != 3'))
+	u'5 <> 3'
+	>>> p(c('5 != 3'))
+	u'5 != 3'
+	>>> li = create_lang_instance({'foo' : 'bar', 'fo2' : 'ba2'})
+	>>> u = li.aml_suggest
+	>>> u('1 = fo')
+	[u'fo2', u'foo']
+	>>> u('1 = FO')
+	[u'fo2', u'foo']
+	"""
 
 	def eval_node(node):
 		en = lambda n: eval_node(n)
@@ -318,5 +359,24 @@ def create_lang_instance(var_map = None):
 
 		return result
 
-	return aml_compile, aml_evaluate, aml_translate_python, aml_translate_sql
+	def aml_suggest(source):
+		suggestions = [ ]
+		if var_map:
+			split = [el for el in re.split(r'(?m)\s+', source) if el]
+			if split:
+				for candidate in var_map.iterkeys():
+					if candidate.lower().startswith(split[-1].lower()):
+						suggestions.append(candidate)
+		suggestions.sort()
+		return suggestions
+
+	lang_instance = LangInstance()
+
+	lang_instance.aml_compile = aml_compile
+	lang_instance.aml_evaluate = aml_evaluate
+	lang_instance.aml_translate_python = aml_translate_python
+	lang_instance.aml_translate_sql = aml_translate_sql
+	lang_instance.aml_suggest = aml_suggest
+
+	return lang_instance
 
