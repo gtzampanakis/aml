@@ -9,86 +9,6 @@ RE_NOT = re.compile('not')
 # And this is needed because otherwise "not" will be usable as an Indentifier.
 K('not')
 
-def py_bool_to_lit(py_bool):
-    return parse( 'true' if py_bool else 'false', BooleanLiteral)
-
-class Identifier(str):
-    grammar = word
-
-class StringLiteral(str):
-
-    def __new__(cls, s):
-        return super(StringLiteral, cls).__new__(cls, ast.literal_eval(s))
-
-    grammar = [re.compile(r'"[^\\\n\r]+?"'), re.compile(r"'[^\\\n\r]+?'")]
-
-class IntegerLiteral(int):
-    grammar = re.compile(r'-?\d+')
-
-class FloatLiteral(float):
-    grammar = re.compile(r'-?\d+.\d+')
-
-class BooleanLiteral(Keyword):
-    grammar = Enum(K('true'), K('false'))
-
-class NullLiteral(Keyword):
-    grammar = Enum(K('null'))
-
-Comparable = [NullLiteral, FloatLiteral, IntegerLiteral, 
-                                StringLiteral, Identifier]
-
-
-class ComparisonOperator(str):
-    grammar = re.compile(r'=|>|<|!=|>=|<=')
-
-class BooleanFunctionName(Keyword):
-    grammar = Enum(K('and'), K('or'))
-
-class ComparisonOperation(List):
-    pass
-
-ComparisonOperation.grammar = (
-        Comparable,
-        blank,
-        attr('comp_op', ComparisonOperator),
-        blank,
-        Comparable,
-)
-
-class BooleanOperationSimple(List):
-# The flag() pypeg2 function works great when parsing but does not work when
-# composing (the flag gets output whether it was in the source text or not. So
-# a workaround is this:
-    grammar = (
-            attr('negated', optional(RE_NOT)),
-            ComparisonOperation,
-    )
-
-class BooleanOperation(List):
-    pass
-
-BooleanOperation.grammar = (
-        BooleanOperationSimple,
-        maybe_some(
-            blank,
-            BooleanFunctionName,
-            blank,
-            BooleanOperationSimple,
-        ),
-)
-
-class Expression(List):
-    pass
-
-Expression.grammar = (
-        [BooleanOperationSimple, ('(', Expression, ')')],
-        maybe_some(
-            blank,
-            BooleanFunctionName,
-            blank,
-            [BooleanOperationSimple, ('(', Expression, ')')],
-        ),
-)
 
 class LangInstance:
 	pass
@@ -169,12 +89,109 @@ def create_lang_instance(var_map = None):
 	>>> p(c('5 != 3'))
 	u'5 != 3'
 	>>> li = create_lang_instance({'foo' : 'bar', 'fo2' : 'ba2'})
+	>>> c = li.aml_compile
+	>>> p = li.aml_translate_python
+	>>> e = li.aml_evaluate
 	>>> u = li.aml_suggest
 	>>> u('1 = fo')
 	[u'fo2', u'foo']
 	>>> u('1 = FO')
 	[u'fo2', u'foo']
+	>>> p(c('null = null'))
+	u'None == None'
+	>>> e(c('foo = "bar"'))
+	True
+	>>> e(c('fo2 = "ba2"'))
+	True
+	>>> c('abc = 1')
+	Traceback (most recent call last):
+	SyntaxError: expecting one of [<class '__init__.BooleanOperationSimple'>, (u'(', <class '__init__.Expression'>, u')')] (line 1)
 	"""
+
+	def py_bool_to_lit(py_bool):
+		return parse( 'true' if py_bool else 'false', BooleanLiteral)
+
+	if not var_map:
+		class Identifier(str):
+			grammar = re.compile(r'$a') # This will match nothing.
+	else:
+		class Identifier(Keyword):
+			grammar = Enum(*[K(v) for v in var_map.iterkeys()])
+		
+	class StringLiteral(str):
+
+		def __new__(cls, s):
+			return super(StringLiteral, cls).__new__(cls, ast.literal_eval(s))
+
+		grammar = [re.compile(r'"[^\\\n\r]+?"'), re.compile(r"'[^\\\n\r]+?'")]
+
+	class IntegerLiteral(int):
+		grammar = re.compile(r'-?\d+')
+
+	class FloatLiteral(float):
+		grammar = re.compile(r'-?\d+.\d+')
+
+	class BooleanLiteral(Keyword):
+		grammar = Enum(K('true'), K('false'))
+
+	class NullLiteral(Keyword):
+		grammar = Enum(K('null'))
+
+	Comparable = [NullLiteral, FloatLiteral, IntegerLiteral, 
+									StringLiteral, Identifier]
+
+
+	class ComparisonOperator(str):
+		grammar = re.compile(r'=|>|<|!=|>=|<=')
+
+	class BooleanFunctionName(Keyword):
+		grammar = Enum(K('and'), K('or'))
+
+	class ComparisonOperation(List):
+		pass
+
+	ComparisonOperation.grammar = (
+			Comparable,
+			blank,
+			attr('comp_op', ComparisonOperator),
+			blank,
+			Comparable,
+	)
+
+	class BooleanOperationSimple(List):
+# The flag() pypeg2 function works great when parsing but does not work when
+# composing (the flag gets output whether it was in the source text or not. So
+# a workaround is this:
+		grammar = (
+				attr('negated', optional(RE_NOT)),
+				ComparisonOperation,
+		)
+
+	class BooleanOperation(List):
+		pass
+
+	BooleanOperation.grammar = (
+			BooleanOperationSimple,
+			maybe_some(
+				blank,
+				BooleanFunctionName,
+				blank,
+				BooleanOperationSimple,
+			),
+	)
+
+	class Expression(List):
+		pass
+
+	Expression.grammar = (
+			[BooleanOperationSimple, ('(', Expression, ')')],
+			maybe_some(
+				blank,
+				BooleanFunctionName,
+				blank,
+				[BooleanOperationSimple, ('(', Expression, ')')],
+			),
+	)
 
 	def eval_node(node):
 		en = lambda n: eval_node(n)
