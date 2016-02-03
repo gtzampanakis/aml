@@ -379,11 +379,14 @@ def create_lang_instance(var_map = None):
 	def aml_suggest(source):
 		suggestions = [ ]
 		if var_map:
-			split = [el for el in re.split(r'(?m)\s+', source) if el]
-			if split:
-				for candidate in var_map.iterkeys():
-					if candidate.lower().startswith(split[-1].lower()):
-						suggestions.append(candidate)
+			if not source:
+				suggestions = list(var_map.iterkeys())
+			else:
+				split = [el for el in re.split(r'(?m)\s+', source) if el]
+				if split:
+					for candidate in var_map.iterkeys():
+						if candidate.lower().startswith(split[-1].lower()):
+							suggestions.append(candidate)
 		suggestions.sort()
 		return suggestions
 
