@@ -1,7 +1,7 @@
 # aml
 Accounting Mini Language --- Small and simple expression language running on Python.
 
-`aml` is a very small programming language running on top of Python. Currently it allows only comparisons between literals and boolean combinations thereof. `aml` is ideal for exposing a powerful but safe interface to users who need to define business rules.
+`aml` is a very small programming language running on top of Python. `aml` is ideal for exposing a powerful but safe interface to users who need to define business rules but have no programming knowledge. In this respect `aml` is an alternative to cumbersome mouse-driven rule engine configurations.
 
 The grammar and parser utilise the [pypeg2](http://fdik.org/pyPEG/) library which must be installed for aml to work.
 
