@@ -46,6 +46,8 @@ def create_lang_instance(var_map = None):
 	False
 	>>> e(c('"foo" = "foo"'))
 	True
+	>>> e(c('"foo"'    '='    "'foo'"))
+	True
 	>>> e(c('"foo" = \\'foo\\''))
 	True
 	>>> e(c('"fo\\'o" = "fo\\'o"'))
@@ -66,6 +68,20 @@ def create_lang_instance(var_map = None):
 	>>> c = li.aml_compile
 	>>> e = li.aml_evaluate
 	>>> e(c('foo = 2.24'))
+	True
+	>>> e(c('foo = 2.2399 or foo = 2.24'))
+	True
+	>>> e(c('foo = 2.2399 or foo = 2.2401'))
+	False
+	>>> e(c('foo in (2.2399, 2.24, null,)'))
+	True
+	>>> e(c('foo in (2.2399, 2.2401, null,)'))
+	False
+	>>> e(c('null in (2.2399, 2.2401, null)'))
+	True
+	>>> e(c('"null" in (2.2399, 2.2401, null)'))
+	False
+	>>> e(c('"null"' 'in' "(2.2399, 'null', null)"))
 	True
 	>>> li = create_lang_instance({'foo' : 'foo'})
 	>>> c = li.aml_compile
@@ -88,6 +104,10 @@ def create_lang_instance(var_map = None):
 	u'5 <> 3'
 	>>> p(c('5 != 3'))
 	u'5 != 3'
+	>>> p(c('5 in (3, 4, 5)'))
+	u'5 in (3, 4, 5,)'
+	>>> p(s('5 in (3, 4, 5)'))
+	u'5 in (3, 4, 5)'
 	>>> li = create_lang_instance({'foo' : 'bar', 'fo2' : 'ba2'})
 	>>> c = li.aml_compile
 	>>> p = li.aml_translate_python
@@ -140,9 +160,23 @@ def create_lang_instance(var_map = None):
 	Comparable = [NullLiteral, FloatLiteral, IntegerLiteral, 
 									StringLiteral, Identifier]
 
+	class ListOfComparables(List):
+		pass
+
+	ListOfComparables.grammar = (
+			'(',
+			Comparable,
+			maybe_some(
+				',',
+				blank,
+				Comparable,
+			),
+			optional(','),
+			')'
+	)
 
 	class ComparisonOperator(str):
-		grammar = re.compile(r'=|>|<|!=|>=|<=')
+		grammar = re.compile(r'=|>|<|!=|>=|<=|in')
 
 	class BooleanFunctionName(Keyword):
 		grammar = Enum(K('and'), K('or'))
@@ -155,12 +189,12 @@ def create_lang_instance(var_map = None):
 			blank,
 			attr('comp_op', ComparisonOperator),
 			blank,
-			Comparable,
+			[Comparable, ListOfComparables],
 	)
 
 	class BooleanOperationSimple(List):
 # The flag() pypeg2 function works great when parsing but does not work when
-# composing (the flag gets output whether it was in the source text or not. So
+# composing (the flag gets output whether it was in the source text or not). So
 # a workaround is this:
 		grammar = (
 				attr('negated', optional(RE_NOT)),
@@ -210,6 +244,8 @@ def create_lang_instance(var_map = None):
 				return False
 		elif isinstance(node, NullLiteral):
 			return None
+		elif isinstance(node, ListOfComparables):
+			return node
 		elif isinstance(node, ComparisonOperation):
 			opa, opb = node[0:2]
 			if node.comp_op == '=':
@@ -224,6 +260,15 @@ def create_lang_instance(var_map = None):
 				return en(opa) >= en(opb)
 			elif node.comp_op == '<=':
 				return en(opa) <= en(opb)
+			elif node.comp_op == 'in':
+				enopa = en(opa)
+				enopb = en(opb)
+				for other_node in list(enopb):
+					virtual_node = ComparisonOperation([opa, other_node])
+					virtual_node.comp_op = '='
+					if en(virtual_node):
+						return True
+				return False
 		elif isinstance(node, BooleanOperationSimple):
 			a = en(node[0])
 			if node.negated:
@@ -315,12 +360,6 @@ def create_lang_instance(var_map = None):
 		return result
 
 	def aml_translate_sql(aml_c):
-
-		def comp_op_compose(self, *args, **kwargs):
-			if self == '!=':
-				return '<>'
-			else:
-				return self
 
 		def comp_op_compose(self, *args, **kwargs):
 			if self == '!=':
