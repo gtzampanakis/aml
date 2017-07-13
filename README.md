@@ -97,3 +97,7 @@ Since the language is very simple, sufficient documentation can be given by exam
 	True
 	>>> e(c('fo2 = "ba2"'))
 	True
+
+## Tests
+
+Run `python -m doctest aml/__init__.py -v`.
