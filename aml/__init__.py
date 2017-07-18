@@ -123,9 +123,6 @@ def create_lang_instance(var_map = None):
 	True
 	>>> e(c('fo2 = "ba2"'))
 	True
-	>>> c('abc = 1')
-	Traceback (most recent call last):
-	SyntaxError: expecting one of [<class '__init__.BooleanOperationSimple'>, (u'(', <class '__init__.Expression'>, u')')] (line 1)
 	"""
 
 	def py_bool_to_lit(py_bool):
