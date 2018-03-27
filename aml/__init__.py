@@ -40,6 +40,14 @@ def create_lang_instance(var_map = None):
 	True
 	>>> eval(p(c('-2 = -2')))
 	True
+	>>> eval(p(c('-2 >= -1')))
+	False
+	>>> eval(p(c('-2 <= -1')))
+	True
+	>>> eval(p(c('2 >= 1')))
+	True
+	>>> eval(p(c('2 <= 1')))
+	False
 	>>> eval(p(c('null = null')))
 	True
 	>>> eval(p(c('1 = null')))
@@ -173,7 +181,7 @@ def create_lang_instance(var_map = None):
 	)
 
 	class ComparisonOperator(str):
-		grammar = re.compile(r'=|>|<|!=|>=|<=|in')
+		grammar = re.compile(r'=|>=|<=|>|<|!=|in')
 
 	class BooleanFunctionName(Keyword):
 		grammar = Enum(K('and'), K('or'))
