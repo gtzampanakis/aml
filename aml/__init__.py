@@ -1,4 +1,4 @@
-from __future__ import unicode_literals, print_function
+
 import re, itertools, operator, ast
 from pypeg2 import *
 
@@ -22,8 +22,6 @@ def create_lang_instance(var_map = None):
 	>>> c = li.aml_compile
 	>>> e = li.aml_evaluate
 	>>> p = li.aml_translate_python
-	>>> s = li.aml_translate_sql
-	>>> u = li.aml_suggest
 	>>> e(c('1 = 0'))
 	False
 	>>> e(c('"1" = "1"'))
@@ -101,32 +99,32 @@ def create_lang_instance(var_map = None):
 	>>> p = li.aml_translate_python
 	>>> s = li.aml_translate_sql
 	>>> s(c('null = null'))
-	u'null is null'
+	'null is null'
 	>>> p(c('null = null'))
-	u'None == None'
+	'None == None'
 	>>> s(c('null != null'))
-	u'null is not null'
+	'null is not null'
 	>>> p(c('null != null'))
-	u'None != None'
+	'None != None'
 	>>> s(c('5 != 3'))
-	u'5 <> 3'
+	'5 <> 3'
 	>>> p(c('5 != 3'))
-	u'5 != 3'
+	'5 != 3'
 	>>> p(c('5 in (3, 4, 5)'))
-	u'5 in (3, 4, 5,)'
+	'5 in (3, 4, 5,)'
 	>>> p(s('5 in (3, 4, 5)'))
-	u'5 in (3, 4, 5)'
+	'5 in (3, 4, 5)'
 	>>> li = create_lang_instance({'foo' : 'bar', 'fo2' : 'ba2'})
 	>>> c = li.aml_compile
 	>>> p = li.aml_translate_python
 	>>> e = li.aml_evaluate
-	>>> u = li.aml_suggest
-	>>> u('1 = fo')
-	[u'fo2', u'foo']
-	>>> u('1 = FO')
-	[u'fo2', u'foo']
+	>>> gg = li.aml_suggest
+	>>> gg('1 = fo')
+	['fo2', 'foo']
+	>>> gg('1 = FO')
+	['fo2', 'foo']
 	>>> p(c('null = null'))
-	u'None == None'
+	'None == None'
 	>>> e(c('foo = "bar"'))
 	True
 	>>> e(c('fo2 = "ba2"'))
@@ -141,7 +139,7 @@ def create_lang_instance(var_map = None):
 			grammar = re.compile(r'$a') # This will match nothing.
 	else:
 		class Identifier(Keyword):
-			grammar = Enum(*[K(v) for v in var_map.iterkeys()])
+			grammar = Enum(*[K(v) for v in var_map.keys()])
 		
 	class StringLiteral(str):
 
@@ -293,7 +291,7 @@ def create_lang_instance(var_map = None):
 						
 
 			for fname in ['and', 'or']:
-				for i in xrange(1, len(node), 2):
+				for i in range(1, len(node), 2):
 					if node[i] == fname:
 						new_self = (
 							node[:i-1]
@@ -424,11 +422,11 @@ def create_lang_instance(var_map = None):
 		suggestions = [ ]
 		if var_map:
 			if not source:
-				suggestions = list(var_map.iterkeys())
+				suggestions = list(var_map.keys())
 			else:
 				split = [el for el in re.split(r'(?m)\s+', source) if el]
 				if split:
-					for candidate in var_map.iterkeys():
+					for candidate in var_map.keys():
 						if candidate.lower().startswith(split[-1].lower()):
 							suggestions.append(candidate)
 		suggestions.sort()
